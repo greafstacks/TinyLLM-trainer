@@ -1,0 +1,38 @@
+name: Scrape daily level comments
+
+on:
+  schedule:
+    # 12:00 UTC -- the GD daily level typically changes once per real-world
+    # day, so this is just "sometime after it's had a chance to accumulate
+    # comments." Adjust if you find a better time.
+    - cron: '0 12 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  scrape:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: pip install requests
+
+      - name: Scrape today's daily level
+        run: python scraper/scrape_gd.py --out scraped/daily.json
+
+      - name: Commit if anything changed
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add scraped/daily.json
+          git diff --cached --quiet && echo "nothing new" || git commit -m "Scrape $(date -u +%Y-%m-%d)"
+          git push

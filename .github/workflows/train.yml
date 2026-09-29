@@ -1,0 +1,37 @@
+name: Train model
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - 'corpus.txt'
+      - 'bpe.py'
+      - 'model_ref.py'
+      - 'train.py'
+      - '.github/workflows/train.yml'
+  workflow_dispatch:
+
+jobs:
+  train:
+    runs-on: ubuntu-latest
+    timeout-minutes: 240
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install training dependencies
+        run: pip install torch numpy --index-url https://download.pytorch.org/whl/cpu
+
+      - name: Train transformer and export model.bin
+        run: python -u train.py --out model.bin
+
+      - name: Upload trained model
+        uses: actions/upload-artifact@v4
+        with:
+          name: model-bin
+          path: model.bin
