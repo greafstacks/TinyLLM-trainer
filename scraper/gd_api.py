@@ -16,6 +16,8 @@ see test_gd_api.py.
 """
 
 import base64
+import binascii
+import sys
 import time
 
 import requests
@@ -39,8 +41,25 @@ def _post(endpoint, data, timeout=15):
 
 
 def decode_message(b64_text):
-    padded = b64_text + "=" * (-len(b64_text) % 4)
-    return base64.b64decode(padded).decode("utf-8", errors="replace")
+    """Try the string as-is; if that's invalid base64 (which does happen --
+    a length one-off-a-multiple-of-4 is mathematically impossible for
+    correctly formed base64, so this is a real, if rare, data quirk),
+    try trimming a stray trailing character or two before giving up. Also
+    rejects anything that decodes to mostly-non-printable bytes -- that's
+    not text, just noise that slipped past the length check. Never raises:
+    an unreadable comment becomes an empty message rather than crashing
+    the whole scrape."""
+    candidates = [b64_text] + [b64_text[:-n] for n in (1, 2, 3) if len(b64_text) > n]
+    for candidate in candidates:
+        padded = candidate + "=" * (-len(candidate) % 4)
+        try:
+            decoded = base64.b64decode(padded, validate=False).decode("utf-8", errors="replace")
+        except (binascii.Error, ValueError):
+            continue
+        printable = sum(1 for ch in decoded if ch.isprintable() or ch in "\n\t")
+        if decoded and printable / len(decoded) > 0.9:
+            return decoded
+    return ""
 
 
 def _parse_kv(segment):
@@ -90,7 +109,17 @@ def get_comments_page(level_id, page, count=100, mode=0):
     body = text.split("#", 1)[0]
     if not body:
         return []
-    return [parse_comment_entry(e) for e in body.split("|")]
+    parsed = []
+    skipped = 0
+    for entry in body.split("|"):
+        try:
+            parsed.append(parse_comment_entry(entry))
+        except Exception as e:  # one malformed comment must not lose the whole page
+            skipped += 1
+            print(f"  (skipped one unparseable comment: {e})", file=sys.stderr)
+    if skipped:
+        print(f"  ({skipped} of {len(body.split('|'))} comments on this page were skipped)", file=sys.stderr)
+    return parsed
 
 
 def get_all_comments(level_id, delay=1.5, max_pages=300, count=100, mode=0, on_page=None):
