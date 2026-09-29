@@ -237,8 +237,8 @@ def self_check(model, bin_path, data, block_size, tok, text):
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--corpus", default="training/corpus.txt")
-    parser.add_argument("--out", default="app/src/main/assets/model.bin")
+    parser.add_argument("--corpus", default="corpus.txt")
+    parser.add_argument("--out", default="model.bin")
     parser.add_argument("--vocab-size", type=int, default=4000,
                         help="tokenizer size: characters + learned subword merges. Bigger = more "
                              "whole-word tokens (closer to word-level), but each token is seen less often.")

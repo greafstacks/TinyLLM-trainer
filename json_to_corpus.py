@@ -3,8 +3,8 @@
 json_to_corpus.py
 
 Turns filtered.json (username + message pairs) into a plain-text corpus
-with no JSON syntax at all -- ready to drop straight into
-training/corpus.txt. Standard library only, runs on Termux.
+with no JSON syntax at all -- ready to drop straight into corpus.txt at
+the repo root. Standard library only, runs on Termux.
 
 Usage:
     python json_to_corpus.py [input.json] [output.txt] [flags]
