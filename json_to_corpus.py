@@ -86,7 +86,11 @@ def main():
     )
 
     with open(output_path, "w", encoding="utf-8") as f:
-        f.write("\n".join(lines))
+        # Every line already ends in terminal punctuation (see add_terminal_punct
+        # above), so joining with a single space reads as flowing text --
+        # "comment one. comment two. comment three." -- instead of one
+        # comment per line.
+        f.write(" ".join(lines))
 
     print(f"Wrote {len(lines)} lines ({sum(len(l) for l in lines)} chars) to {output_path}")
     if drop_base64:
