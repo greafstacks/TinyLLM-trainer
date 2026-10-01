@@ -237,7 +237,7 @@ def self_check(model, bin_path, data, block_size, tok, text):
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--corpus", default="corpus.txt")
+    parser.add_argument("--corpus", default="chat_corpus.txt")
     parser.add_argument("--out", default="model.bin")
     parser.add_argument("--vocab-size", type=int, default=4000,
                         help="tokenizer size: characters + learned subword merges. Bigger = more "
@@ -248,13 +248,16 @@ def main():
     parser.add_argument("--n-layer", type=int, default=6)
     parser.add_argument("--dropout", type=float, default=0.2)
     parser.add_argument("--batch-size", type=int, default=32)
-    parser.add_argument("--max-iters", type=int, default=6000)
-    parser.add_argument("--max-minutes", type=float, default=150,
+    parser.add_argument("--max-iters", type=int, default=1000000,
+                        help="upper bound; with --max-minutes set, the time budget normally ends training first")
+    parser.add_argument("--max-minutes", type=float, default=300,
                         help="stop training after this many minutes and export what we have (0 = no limit)")
     parser.add_argument("--log-interval", type=int, default=50)
     parser.add_argument("--eval-interval", type=int, default=300)
     parser.add_argument("--eval-batches", type=int, default=20)
     parser.add_argument("--learning-rate", type=float, default=1e-3)
+    parser.add_argument("--patience", type=int, default=10,
+                        help="stop early after this many evals in a row without a better val loss (0 = off)")
     parser.add_argument("--seed", type=int, default=1337)
     args = parser.parse_args()
 
@@ -297,9 +300,15 @@ def main():
 
     best_val = float("inf")
     best_state = None
+    bad_evals = 0
     start = time.time()
     budget = args.max_minutes * 60
     for it in range(args.max_iters):
+        # cosine learning-rate decay over whichever runs out first: the time budget or max-iters
+        progress = max(it / args.max_iters, (time.time() - start) / budget if budget > 0 else 0.0)
+        lr = args.learning_rate * (0.05 + 0.95 * 0.5 * (1 + math.cos(math.pi * min(progress, 1.0))))
+        for g in optimizer.param_groups:
+            g["lr"] = lr
         xb, yb = get_batch(train_data, args.block_size, args.batch_size)
         logits, loss = model(xb, yb)
         optimizer.zero_grad(set_to_none=True)
@@ -315,11 +324,18 @@ def main():
             improved = val_loss < best_val
             if improved:
                 best_val = val_loss
+                bad_evals = 0
                 best_state = {k: v.detach().clone() for k, v in model.state_dict().items()}
+            else:
+                bad_evals += 1
             print(f"step {it:5d} | val loss {val_loss:.4f}{'  (best so far)' if improved else ''}", flush=True)
         if out_of_time:
             print(f"time budget of {args.max_minutes:g} min reached at step {it}; "
                   f"stopping early and exporting what we have")
+            break
+        if args.patience > 0 and bad_evals >= args.patience:
+            print(f"val loss hasn't improved for {args.patience} evals; stopping at step {it} "
+                  f"(the best checkpoint is kept)")
             break
 
     if best_state is not None:
@@ -327,11 +343,12 @@ def main():
         print(f"using the best checkpoint (val loss {best_val:.4f})")
 
     model.eval()
-    seed_ids = torch.tensor([data[:8].tolist()])
-    sample = model.generate(seed_ids, max_new_tokens=120)[0].tolist()
-    print("--- sample ---")
-    print(tok.decode(sample))
-    print("--------------")
+    print("--- sample replies ---")
+    for q in ["hello", "what level is this", "how are you"]:
+        prompt = tok.encode("\ue000" + q + "\ue001")
+        out = model.generate(torch.tensor([prompt]), max_new_tokens=40)[0].tolist()
+        print(f"{q!r} -> {tok.decode(out[len(prompt):]).split(chr(10))[0]!r}")
+    print("----------------------")
 
     weights = export_weights(model, tokens, n_base, merges, cfg)
     out_dir = os.path.dirname(args.out)

@@ -27,6 +27,13 @@ Trains the model for [TinyLLM's Android app](../app-repo) and produces
   are visible to anyone who opens the level in-game). Defaults to the
   current Daily Level.
 
+## Chat mode (replies instead of autocomplete)
+
+`gd_chat.py` scrapes a level (any level ID, or Daily by default) and builds
+`chat_corpus.txt` in `message -> reply` format. `termux_setup.sh` runs it on
+your phone and pushes the result, which starts training. See the top of each
+file for usage. `train.py` now trains on `chat_corpus.txt` for up to 5 hours.
+
 ## Workflows
 
 - **Train model** (`train.yml`) -- runs on any push that touches
