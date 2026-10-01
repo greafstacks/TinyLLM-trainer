@@ -11,7 +11,11 @@ Usage:
 
 Defaults: input.json = filtered.json, output.txt = corpus.txt
 
+Default output is CHAT format (message -> reply lines, see chat_data.py) so the
+model learns to reply. Pass --plain for the old flowing-text corpus.
+
 Flags:
+    --plain             old behaviour: all messages joined into one flowing text
     --with-username     prefix each line with "username: "
     --keep-base64       don't drop messages containing a base64-looking blob
     --keep-mentions     don't strip a leading "@username" from messages
@@ -77,6 +81,14 @@ def main():
     drop_base64 = "--keep-base64" not in sys.argv
     strip_mentions = "--keep-mentions" not in sys.argv
     add_terminal_punct = "--no-terminal-punct" not in sys.argv
+
+    if "--plain" not in sys.argv:
+        import chat_data
+        text = chat_data.corpus_from_json(input_path)
+        with open(output_path, "w", encoding="utf-8") as f:
+            f.write(text)
+        print(f"Wrote chat-format corpus to {output_path}")
+        return
 
     with open(input_path, "r", encoding="utf-8") as f:
         data = json.load(f)

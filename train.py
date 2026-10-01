@@ -237,7 +237,7 @@ def self_check(model, bin_path, data, block_size, tok, text):
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--corpus", default="chat_corpus.txt")
+    parser.add_argument("--corpus", default="corpus.txt")
     parser.add_argument("--out", default="model.bin")
     parser.add_argument("--vocab-size", type=int, default=4000,
                         help="tokenizer size: characters + learned subword merges. Bigger = more "
